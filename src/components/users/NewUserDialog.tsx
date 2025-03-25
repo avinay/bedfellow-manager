@@ -24,7 +24,7 @@ type NewUserFormValues = z.infer<typeof formSchema>;
 interface NewUserDialogProps {
   open: boolean;
   onClose: () => void;
-  onCreateUser: (user: Omit<NewUserFormValues, "password">) => void;
+  onCreateUser: (user: NewUserFormValues) => void;
 }
 
 const NewUserDialog: React.FC<NewUserDialogProps> = ({ open, onClose, onCreateUser }) => {
@@ -39,14 +39,7 @@ const NewUserDialog: React.FC<NewUserDialogProps> = ({ open, onClose, onCreateUs
   });
 
   const handleSubmit = (values: NewUserFormValues) => {
-    // In a real app with Supabase, we would create the user here
-    // For now, we'll just pass the data to the parent component
-    
-    // Omit the password before passing to parent (simulating that we don't return passwords)
-    const { password, ...userWithoutPassword } = values;
-    
-    onCreateUser(userWithoutPassword);
-    toast.success("User created successfully");
+    onCreateUser(values);
     form.reset();
   };
 
