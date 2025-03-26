@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -22,35 +21,21 @@ const Users = () => {
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*');
-
-      if (error) {
-        throw error;
+      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+      
+      if (authError) {
+        throw authError;
       }
+      
+      const mappedUsers = authUsers?.users?.map(user => ({
+        id: user.id,
+        name: user.email?.split('@')[0] || 'Unknown',
+        email: user.email,
+        role: 'Guest', // Default role for now
+        status: user.banned ? 'Inactive' : 'Active'
+      })) || [];
 
-      // If no profiles exist yet, show the auth users
-      if (!data || data.length === 0) {
-        const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
-        
-        if (authError) {
-          throw authError;
-        }
-        
-        // Map auth users to the same format as our profiles would have
-        const mappedUsers = authUsers?.users?.map(user => ({
-          id: user.id,
-          name: user.email?.split('@')[0] || 'Unknown',
-          email: user.email,
-          role: 'Guest', // Default role for now
-          status: user.banned ? 'Inactive' : 'Active'
-        })) || [];
-
-        setUsers(mappedUsers);
-      } else {
-        setUsers(data);
-      }
+      setUsers(mappedUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast.error('Failed to load users');
@@ -61,7 +46,6 @@ const Users = () => {
 
   const handleCreateUser = async (newUser) => {
     try {
-      // Create user in Supabase Auth
       const { data, error } = await supabase.auth.admin.createUser({
         email: newUser.email,
         password: newUser.password,
@@ -76,7 +60,6 @@ const Users = () => {
         throw error;
       }
 
-      // Add the new user to our users state
       const createdUser = {
         id: data.user.id,
         name: newUser.name,
@@ -96,17 +79,15 @@ const Users = () => {
 
   const handleDeactivateUser = async (userId) => {
     try {
-      // Update the user in Supabase Auth
       const { error } = await supabase.auth.admin.updateUserById(
         userId,
-        { banned: true }
+        { ban_duration: '87600h' }
       );
 
       if (error) {
         throw error;
       }
 
-      // Update the local state
       setUsers(users.map(user => 
         user.id === userId 
           ? { ...user, status: 'Inactive' } 

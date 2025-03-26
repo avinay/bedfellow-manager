@@ -49,7 +49,7 @@ interface Guest {
   check_out: string;
   room: string;
   bed: string | null;
-  status: "checked-in" | "checked-out" | "reserved";
+  status: string; // Changed from a union type to string to match what comes from the database
   avatar?: string;
 }
 
