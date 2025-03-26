@@ -1,35 +1,21 @@
 
-import React from "react";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-
-const formSchema = z.object({
-  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
-  email: z.string().email({ message: "Please enter a valid email address" }).optional().or(z.literal("")),
-  phone: z.string().optional().or(z.literal("")),
-  country: z.string().min(2, { message: "Country must be at least 2 characters" }),
-  checkIn: z.string().refine((date) => !isNaN(Date.parse(date)), {
-    message: "Please enter a valid check-in date",
-  }),
-  checkOut: z.string().refine((date) => !isNaN(Date.parse(date)), {
-    message: "Please enter a valid check-out date",
-  }),
-  room: z.string().min(1, { message: "Please select a room" }),
-  bed: z.string().optional().or(z.literal("")),
-  status: z.enum(["reserved", "checked-in", "checked-out"], { 
-    required_error: "Please select a status" 
-  }),
-});
-
-type NewGuestFormValues = z.infer<typeof formSchema>;
+import { Loader2 } from "lucide-react";
 
 interface NewGuestDialogProps {
   open: boolean;
@@ -37,244 +23,196 @@ interface NewGuestDialogProps {
   onSuccess: () => void;
 }
 
-const rooms = [
-  "Dorm 101", "Dorm 102", "Dorm 103", "Private 201", "Private 202"
-];
-
-const beds = [
-  "A", "B", "C", "D", "E", "F"
-];
-
-const NewGuestDialog: React.FC<NewGuestDialogProps> = ({ open, onClose, onSuccess }) => {
-  const form = useForm<NewGuestFormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      phone: "",
-      country: "",
-      checkIn: new Date().toISOString().split('T')[0],
-      checkOut: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      room: "",
-      bed: "",
-      status: "reserved",
-    },
+const NewGuestDialog = ({ open, onClose, onSuccess }: NewGuestDialogProps) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    country: "",
+    room: "",
+    bed: "",
+    check_in: "",
+    check_out: "",
+    status: "reserved",
   });
 
-  const isSubmitting = form.formState.isSubmitting;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
-  const handleSubmit = async (values: NewGuestFormValues) => {
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.check_in || !formData.check_out || !formData.room) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
     try {
-      const { error } = await supabase
-        .from("guests")
-        .insert({
-          name: values.name,
-          email: values.email || null,
-          phone: values.phone || null,
-          country: values.country,
-          check_in: values.checkIn,
-          check_out: values.checkOut,
-          room: values.room,
-          bed: values.bed || null,
-          status: values.status,
-        });
+      setIsSubmitting(true);
+      const { error } = await supabase.from("guests").insert([formData]);
 
       if (error) throw error;
 
-      toast.success("Guest added successfully!");
-      form.reset();
+      toast.success("Guest added successfully");
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding guest:", error);
-      toast.error("Failed to add guest. Please try again.");
+      toast.error(error.message || "Failed to add guest");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Add New Guest</DialogTitle>
-          <DialogDescription>
-            Enter the guest's information to create a new reservation.
-          </DialogDescription>
+          <DialogDescription>Enter guest information to create a new reservation</DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Full Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="John Doe" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="country"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Country</FormLabel>
-                    <FormControl>
-                      <Input placeholder="United States" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email Address</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="john@example.com" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="+1 123-456-7890" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="checkIn"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Check In Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="checkOut"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Check Out Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="room"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Room</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a room" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {rooms.map((room) => (
-                          <SelectItem key={room} value={room}>
-                            {room}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="bed"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Bed</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a bed (optional)" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="">None</SelectItem>
-                        {beds.map((bed) => (
-                          <SelectItem key={bed} value={bed}>
-                            Bed {bed}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Name *</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  placeholder="Guest name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="country">Country</Label>
+                <Input
+                  id="country"
+                  name="country"
+                  placeholder="Country"
+                  value={formData.country}
+                  onChange={handleChange}
+                />
+              </div>
             </div>
 
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="reserved">Reserved</SelectItem>
-                      <SelectItem value="checked-in">Checked In</SelectItem>
-                      <SelectItem value="checked-out">Checked Out</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="Email address"
+                  value={formData.email}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone</Label>
+                <Input
+                  id="phone"
+                  name="phone"
+                  placeholder="Phone number"
+                  value={formData.phone}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="room">Room *</Label>
+                <Input
+                  id="room"
+                  name="room"
+                  placeholder="Room number"
+                  value={formData.room}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bed">Bed</Label>
+                <Input
+                  id="bed"
+                  name="bed"
+                  placeholder="Bed number"
+                  value={formData.bed}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="check_in">Check In *</Label>
+                <Input
+                  id="check_in"
+                  name="check_in"
+                  type="date"
+                  value={formData.check_in}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="check_out">Check Out *</Label>
+                <Input
+                  id="check_out"
+                  name="check_out"
+                  type="date"
+                  value={formData.check_out}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select
+                name="status"
+                value={formData.status}
+                onValueChange={(value) => handleSelectChange("status", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="reserved">Reserved</SelectItem>
+                  <SelectItem value="checked-in">Checked In</SelectItem>
+                  <SelectItem value="checked-out">Checked Out</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Adding..." : "Add Guest"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+            </DialogClose>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Add Guest"
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
