@@ -1,5 +1,6 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,9 +9,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
   Search,
-  Plus,
-  Filter,
-  Users,
   UserPlus,
   Hotel,
   ArrowUpDown,
@@ -18,148 +16,89 @@ import {
   Mail,
   Phone,
   MapPin,
-  Calendar
+  Calendar,
+  Users,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle2,
+  XCircle,
+  Loader2
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import NewGuestDialog from "@/components/guests/NewGuestDialog";
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
 
 interface Guest {
-  id: number;
+  id: string;
   name: string;
-  email: string;
-  phone: string;
+  email: string | null;
+  phone: string | null;
   country: string;
-  checkIn: string;
-  checkOut: string;
+  check_in: string;
+  check_out: string;
   room: string;
-  bed: string;
+  bed: string | null;
   status: "checked-in" | "checked-out" | "reserved";
   avatar?: string;
 }
 
+const fetchGuests = async (): Promise<Guest[]> => {
+  const { data, error } = await supabase
+    .from("guests")
+    .select("*");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data || [];
+};
+
 const Guests = () => {
-  const guests: Guest[] = [
-    {
-      id: 1,
-      name: "John Smith",
-      email: "john.smith@example.com",
-      phone: "+1 123-456-7890",
-      country: "United States",
-      checkIn: "2023-07-01",
-      checkOut: "2023-07-05",
-      room: "Dorm 101",
-      bed: "A",
-      status: "checked-in"
-    },
-    {
-      id: 2,
-      name: "Maria Garcia",
-      email: "maria.garcia@example.com",
-      phone: "+34 612-345-678",
-      country: "Spain",
-      checkIn: "2023-07-02",
-      checkOut: "2023-07-06",
-      room: "Dorm 101",
-      bed: "B",
-      status: "checked-in"
-    },
-    {
-      id: 3,
-      name: "Ahmed Hassan",
-      email: "ahmed.hassan@example.com",
-      phone: "+20 100-987-6543",
-      country: "Egypt",
-      checkIn: "2023-06-30",
-      checkOut: "2023-07-07",
-      room: "Dorm 101",
-      bed: "C",
-      status: "checked-in"
-    },
-    {
-      id: 4,
-      name: "Emma Wilson",
-      email: "emma.wilson@example.com",
-      phone: "+44 7700-900-123",
-      country: "United Kingdom",
-      checkIn: "2023-07-03",
-      checkOut: "2023-07-09",
-      room: "Dorm 101",
-      bed: "D",
-      status: "checked-in"
-    },
-    {
-      id: 5,
-      name: "Carlos Mendez",
-      email: "carlos.mendez@example.com",
-      phone: "+52 55-1234-5678",
-      country: "Mexico",
-      checkIn: "2023-07-01",
-      checkOut: "2023-07-08",
-      room: "Dorm 101",
-      bed: "E",
-      status: "checked-in"
-    },
-    {
-      id: 6,
-      name: "Sophie Chen",
-      email: "sophie.chen@example.com",
-      phone: "+86 131-2345-6789",
-      country: "China",
-      checkIn: "2023-07-02",
-      checkOut: "2023-07-06",
-      room: "Dorm 102",
-      bed: "A",
-      status: "checked-in"
-    },
-    {
-      id: 7,
-      name: "Raj Patel",
-      email: "raj.patel@example.com",
-      phone: "+91 98765-43210",
-      country: "India",
-      checkIn: "2023-07-01",
-      checkOut: "2023-07-05",
-      room: "Dorm 102",
-      bed: "B",
-      status: "checked-in"
-    },
-    {
-      id: 8,
-      name: "Olivia Johnson",
-      email: "olivia.johnson@example.com",
-      phone: "+1 234-567-8901",
-      country: "Canada",
-      checkIn: "2023-07-03",
-      checkOut: "2023-07-08",
-      room: "Dorm 102",
-      bed: "D",
-      status: "checked-in"
-    },
-    {
-      id: 9,
-      name: "Luis Fernandez",
-      email: "luis.fernandez@example.com",
-      phone: "+54 11-2345-6789",
-      country: "Argentina",
-      checkIn: "2023-06-29",
-      checkOut: "2023-07-04",
-      room: "Dorm 102",
-      bed: "E",
-      status: "checked-in"
-    },
-    {
-      id: 10,
-      name: "Anna Schmidt",
-      email: "anna.schmidt@example.com",
-      phone: "+49 151-1234-5678",
-      country: "Germany",
-      checkIn: "2023-07-10",
-      checkOut: "2023-07-15",
-      room: "Private 201",
-      bed: "-",
-      status: "reserved"
-    },
-  ];
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentTab, setCurrentTab] = useState("current");
+  const [showNewGuestDialog, setShowNewGuestDialog] = useState(false);
+  
+  const { 
+    data: guests = [], 
+    isLoading, 
+    isError, 
+    refetch 
+  } = useQuery({
+    queryKey: ["guests"],
+    queryFn: fetchGuests
+  });
+
+  const handleRefresh = () => {
+    refetch();
+  };
+
+  const filteredGuests = guests.filter(guest => {
+    const matchesSearch = guest.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          (guest.country && guest.country.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                          (guest.email && guest.email.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    if (currentTab === "current") {
+      return matchesSearch && guest.status === "checked-in";
+    } else if (currentTab === "upcoming") {
+      return matchesSearch && guest.status === "reserved";
+    } else if (currentTab === "history") {
+      return matchesSearch && guest.status === "checked-out";
+    }
+    
+    return matchesSearch;
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -177,6 +116,36 @@ const Guests = () => {
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
+
+  // Country statistics
+  const countryStats = guests.reduce((acc: Record<string, number>, guest) => {
+    const country = guest.country || "Unknown";
+    acc[country] = (acc[country] || 0) + 1;
+    return acc;
+  }, {});
+
+  const topCountries = Object.entries(countryStats)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+  // Stay duration statistics
+  const stayDurations = guests.map(guest => {
+    const checkIn = new Date(guest.check_in);
+    const checkOut = new Date(guest.check_out);
+    return Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+  }).filter(days => !isNaN(days));
+
+  const averageStay = stayDurations.length 
+    ? (stayDurations.reduce((sum, days) => sum + days, 0) / stayDurations.length).toFixed(1) 
+    : "0.0";
+  
+  const shortestStay = stayDurations.length ? Math.min(...stayDurations) : 0;
+  const longestStay = stayDurations.length ? Math.max(...stayDurations) : 0;
+
+  // Occupancy calculation (assuming 10 beds for this example)
+  const totalBeds = 10;
+  const occupiedBeds = guests.filter(guest => guest.status === "checked-in").length;
+  const occupancyRate = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0;
 
   return (
     <AppLayout title="Guests">
@@ -198,6 +167,8 @@ const Guests = () => {
               <Input
                 placeholder="Search guests..."
                 className="pl-9 w-[250px]"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
             
@@ -206,14 +177,17 @@ const Guests = () => {
               <span>Filter</span>
             </Button>
             
-            <Button className="flex items-center gap-2">
+            <Button 
+              className="flex items-center gap-2"
+              onClick={() => setShowNewGuestDialog(true)}
+            >
               <UserPlus size={16} />
               <span>Add Guest</span>
             </Button>
           </div>
         </div>
 
-        <Tabs defaultValue="current">
+        <Tabs defaultValue="current" value={currentTab} onValueChange={setCurrentTab}>
           <TabsList className="mb-4">
             <TabsTrigger value="current">Current Guests</TabsTrigger>
             <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
@@ -223,101 +197,315 @@ const Guests = () => {
           <TabsContent value="current">
             <Card>
               <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-4 font-medium text-muted-foreground text-sm">
-                          <div className="flex items-center gap-1">
-                            <span>Guest</span>
-                            <ArrowUpDown size={14} />
-                          </div>
-                        </th>
-                        <th className="text-left p-4 font-medium text-muted-foreground text-sm">Status</th>
-                        <th className="text-left p-4 font-medium text-muted-foreground text-sm">Room/Bed</th>
-                        <th className="text-left p-4 font-medium text-muted-foreground text-sm">Check In</th>
-                        <th className="text-left p-4 font-medium text-muted-foreground text-sm">Check Out</th>
-                        <th className="text-left p-4 font-medium text-muted-foreground text-sm">Contact</th>
-                        <th className="text-right p-4 font-medium text-muted-foreground text-sm">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {guests.map((guest) => (
-                        <motion.tr
-                          key={guest.id}
-                          initial={{ opacity: 0, y: 5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="border-b hover:bg-muted/40 transition-colors"
-                        >
-                          <td className="p-4">
-                            <div className="flex items-center gap-3">
-                              <Avatar>
-                                <AvatarFallback>{getInitials(guest.name)}</AvatarFallback>
-                                {guest.avatar && <AvatarImage src={guest.avatar} alt={guest.name} />}
-                              </Avatar>
-                              <div>
-                                <p className="font-medium">{guest.name}</p>
-                                <p className="text-xs text-muted-foreground">{guest.country}</p>
-                              </div>
+                {isLoading ? (
+                  <div className="flex justify-center items-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : isError ? (
+                  <div className="flex justify-center items-center p-8 text-destructive">
+                    Error loading guests. Please try again.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>
+                            <div className="flex items-center gap-1">
+                              <span>Guest</span>
+                              <ArrowUpDown size={14} />
                             </div>
-                          </td>
-                          <td className="p-4">
-                            <Badge className={getStatusColor(guest.status)}>
-                              {guest.status === "checked-in" ? "Checked In" : 
-                                guest.status === "checked-out" ? "Checked Out" : "Reserved"}
-                            </Badge>
-                          </td>
-                          <td className="p-4">
-                            <div className="flex items-center gap-2">
-                              <Hotel size={16} className="text-muted-foreground" />
-                              <span>{guest.room}{guest.bed !== "-" ? ` • Bed ${guest.bed}` : ""}</span>
-                            </div>
-                          </td>
-                          <td className="p-4">{guest.checkIn}</td>
-                          <td className="p-4">{guest.checkOut}</td>
-                          <td className="p-4">
-                            <div className="flex items-center gap-3">
-                              <button className="rounded-full p-1.5 hover:bg-secondary text-muted-foreground">
-                                <Mail size={16} />
-                              </button>
-                              <button className="rounded-full p-1.5 hover:bg-secondary text-muted-foreground">
-                                <Phone size={16} />
-                              </button>
-                            </div>
-                          </td>
-                          <td className="p-4 text-right">
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <MoreHorizontal size={16} />
-                            </Button>
-                          </td>
-                        </motion.tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                          </TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Room/Bed</TableHead>
+                          <TableHead>Check In</TableHead>
+                          <TableHead>Check Out</TableHead>
+                          <TableHead>Contact</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredGuests.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                              No guests found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredGuests.map((guest) => (
+                            <motion.tr
+                              key={guest.id}
+                              initial={{ opacity: 0, y: 5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="border-b hover:bg-muted/40 transition-colors"
+                            >
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  <Avatar>
+                                    <AvatarFallback>{getInitials(guest.name)}</AvatarFallback>
+                                    {guest.avatar && <AvatarImage src={guest.avatar} alt={guest.name} />}
+                                  </Avatar>
+                                  <div>
+                                    <p className="font-medium">{guest.name}</p>
+                                    <p className="text-xs text-muted-foreground">{guest.country}</p>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={getStatusColor(guest.status)}>
+                                  {guest.status === "checked-in" ? "Checked In" : 
+                                    guest.status === "checked-out" ? "Checked Out" : "Reserved"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Hotel size={16} className="text-muted-foreground" />
+                                  <span>{guest.room}{guest.bed ? ` • Bed ${guest.bed}` : ""}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>{guest.check_in}</TableCell>
+                              <TableCell>{guest.check_out}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  {guest.email && (
+                                    <button 
+                                      className="rounded-full p-1.5 hover:bg-secondary text-muted-foreground"
+                                      onClick={() => window.location.href = `mailto:${guest.email}`}
+                                    >
+                                      <Mail size={16} />
+                                    </button>
+                                  )}
+                                  {guest.phone && (
+                                    <button 
+                                      className="rounded-full p-1.5 hover:bg-secondary text-muted-foreground"
+                                      onClick={() => window.location.href = `tel:${guest.phone}`}
+                                    >
+                                      <Phone size={16} />
+                                    </button>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreHorizontal size={16} />
+                                </Button>
+                              </TableCell>
+                            </motion.tr>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
           
           <TabsContent value="upcoming">
             <Card>
-              <CardHeader>
-                <CardTitle>Upcoming Reservations</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">You have 3 upcoming reservations for this week.</p>
+              <CardContent className="p-0">
+                {isLoading ? (
+                  <div className="flex justify-center items-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>
+                            <div className="flex items-center gap-1">
+                              <span>Guest</span>
+                              <ArrowUpDown size={14} />
+                            </div>
+                          </TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Room/Bed</TableHead>
+                          <TableHead>Check In</TableHead>
+                          <TableHead>Check Out</TableHead>
+                          <TableHead>Contact</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredGuests.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                              No upcoming reservations
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredGuests.map((guest) => (
+                            <motion.tr
+                              key={guest.id}
+                              initial={{ opacity: 0, y: 5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="border-b hover:bg-muted/40 transition-colors"
+                            >
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  <Avatar>
+                                    <AvatarFallback>{getInitials(guest.name)}</AvatarFallback>
+                                    {guest.avatar && <AvatarImage src={guest.avatar} alt={guest.name} />}
+                                  </Avatar>
+                                  <div>
+                                    <p className="font-medium">{guest.name}</p>
+                                    <p className="text-xs text-muted-foreground">{guest.country}</p>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={getStatusColor(guest.status)}>
+                                  {guest.status === "checked-in" ? "Checked In" : 
+                                    guest.status === "checked-out" ? "Checked Out" : "Reserved"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Hotel size={16} className="text-muted-foreground" />
+                                  <span>{guest.room}{guest.bed ? ` • Bed ${guest.bed}` : ""}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>{guest.check_in}</TableCell>
+                              <TableCell>{guest.check_out}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  {guest.email && (
+                                    <button 
+                                      className="rounded-full p-1.5 hover:bg-secondary text-muted-foreground"
+                                      onClick={() => window.location.href = `mailto:${guest.email}`}
+                                    >
+                                      <Mail size={16} />
+                                    </button>
+                                  )}
+                                  {guest.phone && (
+                                    <button 
+                                      className="rounded-full p-1.5 hover:bg-secondary text-muted-foreground"
+                                      onClick={() => window.location.href = `tel:${guest.phone}`}
+                                    >
+                                      <Phone size={16} />
+                                    </button>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreHorizontal size={16} />
+                                </Button>
+                              </TableCell>
+                            </motion.tr>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
           
           <TabsContent value="history">
             <Card>
-              <CardHeader>
-                <CardTitle>Guest History</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">View previous stays and guest history here.</p>
+              <CardContent className="p-0">
+                {isLoading ? (
+                  <div className="flex justify-center items-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>
+                            <div className="flex items-center gap-1">
+                              <span>Guest</span>
+                              <ArrowUpDown size={14} />
+                            </div>
+                          </TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Room/Bed</TableHead>
+                          <TableHead>Check In</TableHead>
+                          <TableHead>Check Out</TableHead>
+                          <TableHead>Contact</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredGuests.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                              No guest history found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredGuests.map((guest) => (
+                            <motion.tr
+                              key={guest.id}
+                              initial={{ opacity: 0, y: 5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="border-b hover:bg-muted/40 transition-colors"
+                            >
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  <Avatar>
+                                    <AvatarFallback>{getInitials(guest.name)}</AvatarFallback>
+                                    {guest.avatar && <AvatarImage src={guest.avatar} alt={guest.name} />}
+                                  </Avatar>
+                                  <div>
+                                    <p className="font-medium">{guest.name}</p>
+                                    <p className="text-xs text-muted-foreground">{guest.country}</p>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={getStatusColor(guest.status)}>
+                                  {guest.status === "checked-in" ? "Checked In" : 
+                                    guest.status === "checked-out" ? "Checked Out" : "Reserved"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Hotel size={16} className="text-muted-foreground" />
+                                  <span>{guest.room}{guest.bed ? ` • Bed ${guest.bed}` : ""}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>{guest.check_in}</TableCell>
+                              <TableCell>{guest.check_out}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  {guest.email && (
+                                    <button 
+                                      className="rounded-full p-1.5 hover:bg-secondary text-muted-foreground"
+                                      onClick={() => window.location.href = `mailto:${guest.email}`}
+                                    >
+                                      <Mail size={16} />
+                                    </button>
+                                  )}
+                                  {guest.phone && (
+                                    <button 
+                                      className="rounded-full p-1.5 hover:bg-secondary text-muted-foreground"
+                                      onClick={() => window.location.href = `tel:${guest.phone}`}
+                                    >
+                                      <Phone size={16} />
+                                    </button>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreHorizontal size={16} />
+                                </Button>
+                              </TableCell>
+                            </motion.tr>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -334,26 +522,16 @@ const Guests = () => {
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-              <li className="flex items-center justify-between">
-                <span>United States</span>
-                <Badge>3</Badge>
-              </li>
-              <li className="flex items-center justify-between">
-                <span>Spain</span>
-                <Badge>2</Badge>
-              </li>
-              <li className="flex items-center justify-between">
-                <span>Germany</span>
-                <Badge>2</Badge>
-              </li>
-              <li className="flex items-center justify-between">
-                <span>United Kingdom</span>
-                <Badge>1</Badge>
-              </li>
-              <li className="flex items-center justify-between">
-                <span>Australia</span>
-                <Badge>1</Badge>
-              </li>
+              {topCountries.length === 0 ? (
+                <li className="text-center py-4 text-muted-foreground">No data available</li>
+              ) : (
+                topCountries.map(([country, count]) => (
+                  <li key={country} className="flex items-center justify-between">
+                    <span>{country}</span>
+                    <Badge>{count}</Badge>
+                  </li>
+                ))
+              )}
             </ul>
           </CardContent>
         </Card>
@@ -369,20 +547,20 @@ const Guests = () => {
             <div>
               <div className="flex justify-between mb-1">
                 <span className="text-sm">Average</span>
-                <span className="text-sm font-medium">4.5 days</span>
+                <span className="text-sm font-medium">{averageStay} days</span>
               </div>
               <div className="w-full bg-secondary rounded-full h-2 mb-4">
-                <div className="bg-primary h-full rounded-full" style={{ width: "45%" }}></div>
+                <div className="bg-primary h-full rounded-full" style={{ width: `${Math.min(Number(averageStay) * 10, 100)}%` }}></div>
               </div>
               
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
                   <p className="text-muted-foreground">Shortest</p>
-                  <p className="font-medium">2 days</p>
+                  <p className="font-medium">{shortestStay} days</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Longest</p>
-                  <p className="font-medium">8 days</p>
+                  <p className="font-medium">{longestStay} days</p>
                 </div>
               </div>
             </div>
@@ -401,10 +579,10 @@ const Guests = () => {
               <div>
                 <div className="flex justify-between mb-1">
                   <span className="text-sm">Current Occupancy</span>
-                  <span className="text-sm font-medium">85%</span>
+                  <span className="text-sm font-medium">{occupancyRate}%</span>
                 </div>
                 <div className="w-full bg-secondary rounded-full h-2">
-                  <div className="bg-primary h-full rounded-full" style={{ width: "85%" }}></div>
+                  <div className="bg-primary h-full rounded-full" style={{ width: `${occupancyRate}%` }}></div>
                 </div>
               </div>
               
@@ -431,6 +609,17 @@ const Guests = () => {
           </CardContent>
         </Card>
       </div>
+
+      {showNewGuestDialog && (
+        <NewGuestDialog 
+          open={showNewGuestDialog}
+          onClose={() => setShowNewGuestDialog(false)}
+          onSuccess={() => {
+            setShowNewGuestDialog(false);
+            handleRefresh();
+          }}
+        />
+      )}
     </AppLayout>
   );
 };
