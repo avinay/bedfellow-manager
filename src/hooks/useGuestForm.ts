@@ -47,7 +47,15 @@ export const useGuestForm = (onSuccess: () => void) => {
 
     try {
       setIsSubmitting(true);
-      const { error } = await supabase.from("guests").insert([formData]);
+      
+      // Create a sanitized version of the form data to submit
+      const guestData = {
+        ...formData,
+        // If check_out is empty, set it to null so Supabase doesn't try to parse an empty string as a date
+        check_out: formData.check_out || null
+      };
+
+      const { error } = await supabase.from("guests").insert([guestData]);
 
       if (error) throw error;
 
