@@ -48,7 +48,7 @@ const NewGuestDialog = ({ open, onClose, onSuccess }: NewGuestDialogProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.check_in || !formData.check_out || !formData.room) {
+    if (!formData.name || !formData.check_in || !formData.room) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -164,14 +164,13 @@ const NewGuestDialog = ({ open, onClose, onSuccess }: NewGuestDialogProps) => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="check_out">Check Out *</Label>
+                <Label htmlFor="check_out">Check Out</Label>
                 <Input
                   id="check_out"
                   name="check_out"
                   type="date"
                   value={formData.check_out}
                   onChange={handleChange}
-                  required
                 />
               </div>
             </div>
